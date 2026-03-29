@@ -1,0 +1,85 @@
+/* Main Application Stylesheet */
+
+QMainWindow {
+    background: rgba(40, 40, 45, 240);
+    border-radius: 12px;
+}
+
+#centralWidget {
+    background: transparent;
+}
+
+/* Search Edit */
+#searchEdit {
+    background: rgba(60, 60, 65, 200);
+    border: 1px solid rgba(100, 100, 100, 150);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #e0e0e0;
+    font-size: 14px;
+    selection-background-color: #0078d4;
+}
+
+#searchEdit:focus {
+    border: 1px solid rgba(0, 120, 212, 200);
+}
+
+#searchEdit::placeholder {
+    color: #888888;
+}
+
+#searchEdit QToolButton {
+    background: transparent;
+    border: none;
+    color: #888888;
+}
+
+/* List View */
+#listView {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+#listView::item {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    margin: 2px 0px;
+    border-radius: 6px;
+}
+
+#listView::item:hover {
+    background: rgba(255, 255, 255, 20);
+}
+
+#listView::item:selected {
+    background: rgba(0, 120, 212, 180);
+}
+
+/* Scrollbar */
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 60);
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 100);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
