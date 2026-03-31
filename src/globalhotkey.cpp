@@ -1,14 +1,16 @@
 #include "globalhotkey.h"
 
-
+#include <KF6/KGlobalAccel/kglobalaccel.h>
+#include <QAction>
 #include <QDBusConnection>
+#include <QDBusInterface>
 #include <QDBusReply>
 #include <QDebug>
 #include <QKeySequence>
 
 GlobalHotkey::GlobalHotkey(QObject *parent)
     : QObject(parent)
-    , m_kdeInterface(nullptr)
+    , m_action(nullptr)
     , m_gnomeInterface(nullptr)
     , m_registered(false)
 {
@@ -22,18 +24,18 @@ GlobalHotkey::~GlobalHotkey()
 bool GlobalHotkey::registerHotkey(const QKeySequence &shortcut)
 {
     unregisterHotkey();
-    
+
     m_shortcutString = shortcut.toString(QKeySequence::NativeText);
-    
+
     // Try KDE first, then GNOME
     if (registerKdeHotkey(shortcut)) {
         return true;
     }
-    
+
     if (registerGnomeHotkey(shortcut)) {
         return true;
     }
-    
+
     qWarning() << "Failed to register global hotkey. Desktop environment not supported.";
     return false;
 }
@@ -43,71 +45,44 @@ void GlobalHotkey::unregisterHotkey()
     if (!m_registered) {
         return;
     }
-    
-    if (m_kdeInterface && m_kdeInterface->isValid()) {
-        m_kdeInterface->call(QStringLiteral("unRegister"), QStringLiteral("clipboard-manager-toggle"));
+
+    if (m_action) {
+        KGlobalAccel::self()->removeAllShortcuts(m_action);
+        m_action->deleteLater();
+        m_action = nullptr;
     }
-    
+
     if (m_gnomeInterface && m_gnomeInterface->isValid()) {
         m_gnomeInterface->call(QStringLiteral("UngrabAccelerators"), QVariant::fromValue(QList<uint>()));
+        delete m_gnomeInterface;
+        m_gnomeInterface = nullptr;
     }
-    
+
     m_registered = false;
 }
 
 bool GlobalHotkey::registerKdeHotkey(const QKeySequence &shortcut)
 {
-    m_kdeInterface = new QDBusInterface(
-        QStringLiteral("org.kde.kglobalaccel"),
-        QStringLiteral("/kglobalaccel"),
-        QStringLiteral("org.kde.KGlobalAccel"),
-        QDBusConnection::sessionBus(),
-        this
-    );
-    
-    if (!m_kdeInterface->isValid()) {
-        delete m_kdeInterface;
-        m_kdeInterface = nullptr;
+    // Create action with unique object name
+    m_action = new QAction(this);
+    m_action->setObjectName(QStringLiteral("toggle_clipboard_manager"));
+    m_action->setText(QStringLiteral("Toggle Clipboard Manager"));
+
+    // Register global shortcut using KGlobalAccel
+    bool success = KGlobalAccel::setGlobalShortcut(m_action, shortcut);
+    if (!success) {
+        qWarning() << "Failed to register global hotkey with KGlobalAccel";
+        delete m_action;
+        m_action = nullptr;
         return false;
     }
-    
-    // Register component
-    QDBusInterface componentInterface(
-        QStringLiteral("org.kde.kglobalaccel"),
-        QStringLiteral("/kglobalaccel"),
-        QStringLiteral("org.kde.kglobalaccel.Component"),
-        QDBusConnection::sessionBus()
-    );
-    
-    // Try to register the shortcut
-    QDBusReply<bool> reply = m_kdeInterface->call(
-        QStringLiteral("register"),
-        QStringLiteral("clipboard-manager"),
-        QStringLiteral("clipboard-manager-toggle"),
-        shortcut.toString(),
-        shortcut.toString(),
-        shortcut.toString(),
-        QLatin1String(),
-        0
-    );
-    
-    if (reply.isValid() && reply.value()) {
-        m_registered = true;
-        
-        // Connect to the activated signal
-        QDBusConnection::sessionBus().connect(
-            QStringLiteral("org.kde.kglobalaccel"),
-            QStringLiteral("/component/clipboard-manager"),
-            QStringLiteral("org.kde.kglobalaccel.Component"),
-            QStringLiteral("globalShortcutActivated"),
-            this,
-            SLOT(onHotkeyPressed())
-        );
-        
-        return true;
-    }
-    
-    return false;
+
+    // Connect action trigger to our slot
+    connect(m_action, &QAction::triggered, this, &GlobalHotkey::onHotkeyPressed);
+
+    m_registered = true;
+    qDebug() << "Successfully registered KDE global hotkey:" << shortcut.toString(QKeySequence::NativeText);
+    return true;
 }
 
 bool GlobalHotkey::registerGnomeHotkey(const QKeySequence &shortcut)
@@ -119,17 +94,17 @@ bool GlobalHotkey::registerGnomeHotkey(const QKeySequence &shortcut)
         QDBusConnection::sessionBus(),
         this
     );
-    
+
     if (!m_gnomeInterface->isValid()) {
         delete m_gnomeInterface;
         m_gnomeInterface = nullptr;
         return false;
     }
-    
+
     // GNOME uses a different approach - we'd need to use a different method
     // For now, this is a placeholder for GNOME support
     qWarning() << "GNOME global hotkey support not yet fully implemented";
-    
+
     delete m_gnomeInterface;
     m_gnomeInterface = nullptr;
     return false;
