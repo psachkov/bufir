@@ -15,6 +15,15 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#if __has_include(<KWindowSystem>)
+    #include <KWindowSystem>
+    #define HAS_KWINDOWSYSTEM 1
+#else
+    #define HAS_KWINDOWSYSTEM 0
+#endif
+
+#include <QProcess>
+
 // Custom delegate for rendering clipboard items
 class ClipboardItemDelegate : public QStyledItemDelegate {
     Q_OBJECT

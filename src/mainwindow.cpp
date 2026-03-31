@@ -8,6 +8,7 @@
 #include <QKeySequence>
 #include <QMimeData>
 #include <QPainter>
+#include <QProcess>
 #include <QScreen>
 #include <QShortcut>
 #include <QTextDocument>
@@ -149,10 +150,11 @@ void MainWindow::initialize()
     
     // Initialize global hotkey
     m_hotkey = new GlobalHotkey(this);
-    if (m_hotkey->registerHotkey(QKeySequence("Ctrl+Shift+F"))) {
+    if (m_hotkey->registerHotkey(QKeySequence("Ctrl+Alt+G"))) {
         connect(m_hotkey, &GlobalHotkey::activated, this, &MainWindow::onGlobalHotkeyActivated);
+        qDebug() << "Global hotkey registered: " << m_hotkey->shortcutString();
     } else {
-        qWarning() << "Failed to register global hotkey Ctrl+Shift+F";
+        qWarning() << "Failed to register global hotkey: " << m_hotkey->shortcutString();
     }
     
     // Hide initially
@@ -389,12 +391,19 @@ void MainWindow::pasteSelectedItem()
 {
     hideWindow();
     
-    // Simulate paste command
-    QKeyEvent *press = new QKeyEvent(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
-    QKeyEvent *release = new QKeyEvent(QEvent::KeyRelease, Qt::Key_V, Qt::ControlModifier);
-    
-    QApplication::postEvent(QApplication::focusWidget(), press);
-    QApplication::postEvent(QApplication::focusWidget(), release);
+    // Wait a bit for window to hide and previous window to get focus
+    QTimer::singleShot(100, this, []() {
+        // Use xdotool to get active window and send paste command
+        // xdotool getactivewindow returns the window ID of the currently active window
+        // Then we send Ctrl+V to that specific window
+        QProcess::startDetached("bash", {"-c", 
+            "active_win=$(xdotool getactivewindow 2>/dev/null) && "
+            "if [ -n \"$active_win\" ]; then "
+            "  xdotool key --window \"$active_win\" ctrl+v; "
+            "else "
+            "  xdotool key ctrl+v; "
+            "fi"});
+    });
 }
 
 void MainWindow::onSearchTextChanged(const QString &text)
