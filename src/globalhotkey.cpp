@@ -1,6 +1,8 @@
 #include "globalhotkey.h"
 
+
 #include <QDBusConnection>
+#include <QDBusReply>
 #include <QDebug>
 #include <QKeySequence>
 

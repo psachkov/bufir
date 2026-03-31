@@ -4,6 +4,7 @@
 #include "globalhotkey.h"
 #include "systemtray.h"
 
+#include <QStyledItemDelegate>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLineEdit>

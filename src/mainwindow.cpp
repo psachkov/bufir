@@ -95,7 +95,7 @@ QSize ClipboardItemDelegate::sizeHint(const QStyleOptionViewItem &option,
     Q_UNUSED(option)
     Q_UNUSED(index)
     
-    bool isImage = index.data(ClipboardItemDelegate::IsImageRole).toBool();
+    bool isImage = index.data(ClipboardModel::IsImageRole).toBool();
     if (isImage) {
         return QSize(300, IconSize + Padding * 2 + 4);
     }
