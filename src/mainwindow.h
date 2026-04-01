@@ -10,6 +10,7 @@
 #include <QListView>
 #include <QMainWindow>
 #include <QProxyStyle>
+#include <QSortFilterProxyModel>
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -56,6 +57,11 @@ private slots:
     void onTrayClearHistory();
     void onTrayQuit();
     void pasteSelectedItem();
+    // Phase 4: bottom action panel slots (stubbed for now)
+    void onClearAllRequested();
+    void onSettingsRequested();
+    void onAboutRequested();
+    void onQuitRequested();
 
 private:
     void setupUI();
@@ -72,8 +78,14 @@ private:
 
     // Data
     ClipboardModel *m_model;
+    QSortFilterProxyModel *m_proxyModel;
     SystemTray *m_tray;
     GlobalHotkey *m_hotkey;
+    // Phase 4: bottom action buttons
+    QPushButton *m_btnClearAll;
+    QPushButton *m_btnSettings;
+    QPushButton *m_btnAbout;
+    QPushButton *m_btnQuit;
     
     int m_currentIndex;
     bool m_ignoreFocusLoss;

@@ -1,3 +1,39 @@
+/* Design tokens for dark theme */
+@/* Color tokens exported as CSS-like variables via Qt style system */
+:root {
+  --bg: #1e1e2a;            /* background */
+  --surface: #2a2a38;       /* surface panels */
+  --text: #e8e8f0;          /* primary text */
+  --mutedText: #a6a6b8;     /* muted text */
+  --accent: #4a90e2;        /* blue accent */
+  --highlight: #1565c0;     /* highlight blue */
+}
+
+/* Global theme */
+QWidget { background-color: var(--bg); color: var(--text); }
+QFrame { background-color: var(--surface); border: none; }
+
+/* Search bar */
+QLineEdit {
+  background-color: #2a2a38;
+  color: var(--text);
+  border: 1px solid #3a3a4b;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+QLineEdit:focus { border-color: var(--accent); outline: none; }
+
+/* List view */
+QListView { background-color: transparent; border: none; }
+
+/* Bottom action panel */
+.BottomPanel { background-color: #1f1f2a; }
+
+/* Text styles */
+.muted { color: var(--mutedText); }
+.accent { color: var(--accent); }
+.highlight { background-color: var(--highlight); color: white; }
+
 /* Main Application Stylesheet */
 
 QMainWindow {

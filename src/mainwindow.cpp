@@ -132,8 +132,22 @@ void MainWindow::initialize()
     }
     
     m_model = new ClipboardModel(clipboard, db, this);
-    m_listView->setModel(m_model);
-    
+    // Initialize proxy model for filtering/sorting
+    m_proxyModel = new QSortFilterProxyModel(this);
+    m_proxyModel->setSourceModel(m_model);
+    m_listView->setModel(m_proxyModel);
+    // Configure proxy model defaults
+    m_proxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    m_proxyModel->setFilterRole(Qt::DisplayRole);
+    // Bind searchEdit changes to proxy filter (live search)
+    connect(m_searchEdit, &QLineEdit::textChanged, this, [this](const QString& text){
+        QRegularExpression re(text, QRegularExpression::CaseInsensitiveOption);
+        m_proxyModel->setFilterRegularExpression(re);
+    });
+
+    // Phase 4: prepare bottom action buttons (UI wiring will be added when UI exists)
+
+    connect(m_model, &ClipboardModel::itemSelected, this, [this](const ClipboardItem &item) {
     connect(m_model, &ClipboardModel::itemSelected, this, [this](const ClipboardItem &item) {
         Q_UNUSED(item)
         pasteSelectedItem();
@@ -430,6 +444,32 @@ void MainWindow::onTrayClearHistory()
 }
 
 void MainWindow::onTrayQuit()
+{
+    QApplication::quit();
+}
+
+// Phase 4: Bottom action panel slots implementations (simple stubs for now)
+void MainWindow::onClearAllRequested()
+{
+    // Clear clipboard history in model
+    if (m_model) {
+        m_model->clear();
+    }
+}
+
+void MainWindow::onSettingsRequested()
+{
+    // Show settings placeholder
+    qInfo() << "Settings requested";
+}
+
+void MainWindow::onAboutRequested()
+{
+    // Show about placeholder
+    qInfo() << "About requested";
+}
+
+void MainWindow::onQuitRequested()
 {
     QApplication::quit();
 }
