@@ -8,12 +8,16 @@
 #include <QKeySequence>
 #include <QMimeData>
 #include <QPainter>
-#include <QProcess>
 #include <QScreen>
 #include <QShortcut>
 #include <QTextDocument>
 #include <QTimer>
 #include <QWindow>
+#include <QPushButton>
+#include <QHBoxLayout>
+#include <QMessageBox>
+#include <QRegularExpression>
+#include <QGuiApplication>
 
 // ClipboardItemDelegate implementation
 ClipboardItemDelegate::ClipboardItemDelegate(QObject *parent)
@@ -46,7 +50,7 @@ void ClipboardItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem 
     if (isImage) {
         QPixmap pixmap = index.data(ClipboardModel::PreviewPixmapRole).value<QPixmap>();
         if (!pixmap.isNull()) {
-            QRect iconRect(rect.left(), rect.top() + (rect.height() - IconSize) / 2, 
+        QRect iconRect(rect.left(), rect.top() + (rect.height() - IconSize) / 2, 
                           IconSize, IconSize);
             painter->drawPixmap(iconRect, pixmap);
         }
@@ -56,14 +60,14 @@ void ClipboardItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem 
                       rect.width() - IconSize - Padding, rect.height());
         painter->setPen(QColor(200, 200, 200));
         QFont font = painter->font();
-        font.setPointSize(10);
+        font.setPointSize(9);
         painter->setFont(font);
         painter->drawText(textRect, Qt::AlignVCenter | Qt::TextSingleLine, previewText);
     } else {
         // Draw text content
         painter->setPen(QColor(220, 220, 220));
         QFont font = painter->font();
-        font.setPointSize(10);
+        font.setPointSize(9);
         painter->setFont(font);
         
         QRect textRect = rect;
@@ -81,7 +85,7 @@ void ClipboardItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem 
         QString shortcut = QStringLiteral("⌘%1").arg(row + 1);
         painter->setPen(QColor(150, 150, 150));
         QFont smallFont = painter->font();
-        smallFont.setPointSize(8);
+        smallFont.setPointSize(7);
         painter->setFont(smallFont);
         painter->drawText(option.rect.adjusted(option.rect.width() - 30, 0, -Padding, 0), 
                          Qt::AlignRight | Qt::AlignVCenter, shortcut);
@@ -98,12 +102,12 @@ QSize ClipboardItemDelegate::sizeHint(const QStyleOptionViewItem &option,
     
     bool isImage = index.data(ClipboardModel::IsImageRole).toBool();
     if (isImage) {
-        return QSize(300, IconSize + Padding * 2 + 4);
+        return QSize(260, IconSize + Padding * 2 + 2);
     }
-    
+
     QFontMetrics fm(option.font);
     int lineHeight = fm.height();
-    return QSize(300, lineHeight * MaxTextLines + Padding * 2 + 4);
+    return QSize(260, lineHeight * MaxTextLines + Padding * 2 + 2);
 }
 
 // MainWindow implementation
@@ -133,8 +137,20 @@ void MainWindow::initialize()
     }
     
     m_model = new ClipboardModel(clipboard, db, this);
-    m_listView->setModel(m_model);
-    
+    // Initialize proxy model for filtering/sorting
+    m_proxyModel = new QSortFilterProxyModel(this);
+    m_proxyModel->setSourceModel(m_model);
+    m_listView->setModel(m_proxyModel);
+    // Configure proxy model defaults
+    m_proxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    m_proxyModel->setFilterRole(Qt::DisplayRole);
+    // Bind searchEdit changes to proxy filter (live search)
+    connect(m_searchEdit, &QLineEdit::textChanged, this, [this](const QString& text){
+        QRegularExpression re(text, QRegularExpression::CaseInsensitiveOption);
+        m_proxyModel->setFilterRegularExpression(re);
+    });
+
+    // Connect model selection to paste action
     connect(m_model, &ClipboardModel::itemSelected, this, [this](const ClipboardItem &item) {
         Q_UNUSED(item)
         pasteSelectedItem();
@@ -154,7 +170,7 @@ void MainWindow::initialize()
         connect(m_hotkey, &GlobalHotkey::activated, this, &MainWindow::onGlobalHotkeyActivated);
         qDebug() << "Global hotkey registered: " << m_hotkey->shortcutString();
     } else {
-        qWarning() << "Failed to register global hotkey: " << m_hotkey->shortcutString();
+        qWarning() << "Failed to register global hotkey Ctrl+Alt+G";
     }
     
     // Hide initially
@@ -168,14 +184,17 @@ void MainWindow::setupUI()
     setCentralWidget(m_centralWidget);
     
     m_mainLayout = new QVBoxLayout(m_centralWidget);
-    m_mainLayout->setContentsMargins(12, 12, 12, 12);
-    m_mainLayout->setSpacing(8);
+    // Reduce margins and spacing for compact layout
+    m_mainLayout->setContentsMargins(6, 6, 6, 6);
+    m_mainLayout->setSpacing(2);
     
     // Search box
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setObjectName(QStringLiteral("searchEdit"));
     m_searchEdit->setPlaceholderText(QStringLiteral("начните печатать для поиска..."));
     m_searchEdit->setClearButtonEnabled(true);
+    // Make search edit slightly smaller
+    m_searchEdit->setFixedHeight(26);
     m_mainLayout->addWidget(m_searchEdit);
     
     // List view
@@ -185,7 +204,7 @@ void MainWindow::setupUI()
     m_listView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_listView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_listView->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    m_listView->setItemDelegate(new ClipboardItemDelegate(this));
+    m_listView->setItemDelegate(new ClipboardItemDelegate(m_listView));
     m_listView->setFrameShape(QFrame::NoFrame);
     
     // Custom style for scroll bar
@@ -209,11 +228,45 @@ void MainWindow::setupUI()
     )");
     
     m_mainLayout->addWidget(m_listView);
+
+    // Bottom action panel
+    QWidget *bottomPanel = new QWidget(this);
+    bottomPanel->setObjectName(QStringLiteral("bottomPanel"));
+    QHBoxLayout *bottomLayout = new QHBoxLayout(bottomPanel);
+    bottomLayout->setContentsMargins(0, 4, 0, 0);
+    bottomLayout->setSpacing(6);
+
+    m_btnClearAll = new QPushButton(tr("Очистить всё"), bottomPanel);
+    m_btnSettings = new QPushButton(tr("Настройки"), bottomPanel);
+    m_btnAbout = new QPushButton(tr("О приложении"), bottomPanel);
+    m_btnQuit = new QPushButton(tr("Завершить"), bottomPanel);
+
+    // Make buttons compact
+    const int btnH = 24;
+    m_btnClearAll->setFixedHeight(btnH);
+    m_btnSettings->setFixedHeight(btnH);
+    m_btnAbout->setFixedHeight(btnH);
+    m_btnQuit->setFixedHeight(btnH);
+
+    m_btnClearAll->setObjectName(QStringLiteral("btnClearAll"));
+    m_btnSettings->setObjectName(QStringLiteral("btnSettings"));
+    m_btnAbout->setObjectName(QStringLiteral("btnAbout"));
+    m_btnQuit->setObjectName(QStringLiteral("btnQuit"));
+
+    bottomLayout->addWidget(m_btnClearAll);
+    bottomLayout->addStretch();
+    bottomLayout->addWidget(m_btnSettings);
+    bottomLayout->addWidget(m_btnAbout);
+    bottomLayout->addWidget(m_btnQuit);
+
+    m_mainLayout->addWidget(bottomPanel);
     
-    // Set fixed width, dynamic height
-    setFixedWidth(450);
-    setMinimumHeight(200);
-    setMaximumHeight(600);
+    // Make window narrower and full-height
+    const int desiredWidth = 320;
+    setFixedWidth(desiredWidth);
+    int screenH = QGuiApplication::primaryScreen()->availableGeometry().height();
+    // Slightly inset from top/bottom to respect system bars
+    setFixedHeight(screenH - 40);
     
     // Install event filter for focus loss detection
     qApp->installEventFilter(this);
@@ -223,7 +276,8 @@ void MainWindow::applyStyles()
 {
     setStyleSheet(R"(
         QMainWindow {
-            background: rgba(40, 40, 45, 240);
+            /* Сделано менее прозрачным (более плотный фон) */
+            background: rgba(36, 36, 40, 255);
             border-radius: 12px;
         }
         
@@ -232,12 +286,12 @@ void MainWindow::applyStyles()
         }
         
         #searchEdit {
-            background: rgba(60, 60, 65, 200);
-            border: 1px solid rgba(100, 100, 100, 150);
-            border-radius: 8px;
-            padding: 8px 12px;
+            background: rgba(60, 60, 65, 230);
+            border: 1px solid rgba(90, 90, 90, 180);
+            border-radius: 6px;
+            padding: 6px 10px;
             color: #e0e0e0;
-            font-size: 14px;
+            font-size: 13px;
             selection-background-color: #0078d4;
         }
         
@@ -258,7 +312,7 @@ void MainWindow::applyStyles()
         #listView::item {
             background: transparent;
             border: none;
-            padding: 4px;
+            padding: 2px;
         }
     )");
 }
@@ -268,6 +322,11 @@ void MainWindow::setupConnections()
     connect(m_listView, &QListView::activated, this, &MainWindow::onItemActivated);
     connect(m_listView, &QListView::clicked, this, &MainWindow::onItemActivated);
     connect(m_searchEdit, &QLineEdit::textChanged, this, &MainWindow::onSearchTextChanged);
+    // Bottom panel actions
+    connect(m_btnClearAll, &QPushButton::clicked, this, &MainWindow::onClearAllRequested);
+    connect(m_btnSettings, &QPushButton::clicked, this, &MainWindow::onSettingsRequested);
+    connect(m_btnAbout, &QPushButton::clicked, this, &MainWindow::onAboutRequested);
+    connect(m_btnQuit, &QPushButton::clicked, this, &MainWindow::onQuitRequested);
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
@@ -391,19 +450,12 @@ void MainWindow::pasteSelectedItem()
 {
     hideWindow();
     
-    // Wait a bit for window to hide and previous window to get focus
-    QTimer::singleShot(100, this, []() {
-        // Use xdotool to get active window and send paste command
-        // xdotool getactivewindow returns the window ID of the currently active window
-        // Then we send Ctrl+V to that specific window
-        QProcess::startDetached("bash", {"-c", 
-            "active_win=$(xdotool getactivewindow 2>/dev/null) && "
-            "if [ -n \"$active_win\" ]; then "
-            "  xdotool key --window \"$active_win\" ctrl+v; "
-            "else "
-            "  xdotool key ctrl+v; "
-            "fi"});
-    });
+    // Simulate paste command
+    QKeyEvent *press = new QKeyEvent(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+    QKeyEvent *release = new QKeyEvent(QEvent::KeyRelease, Qt::Key_V, Qt::ControlModifier);
+    
+    QApplication::postEvent(QApplication::focusWidget(), press);
+    QApplication::postEvent(QApplication::focusWidget(), release);
 }
 
 void MainWindow::onSearchTextChanged(const QString &text)
@@ -439,6 +491,32 @@ void MainWindow::onTrayClearHistory()
 }
 
 void MainWindow::onTrayQuit()
+{
+    QApplication::quit();
+}
+
+// Phase 4: Bottom action panel slots implementations (simple stubs for now)
+void MainWindow::onClearAllRequested()
+{
+    // Clear clipboard history in model
+    if (m_model) {
+        m_model->clear();
+    }
+}
+
+void MainWindow::onSettingsRequested()
+{
+    // Show settings placeholder
+    qInfo() << "Settings requested";
+}
+
+void MainWindow::onAboutRequested()
+{
+    // Show about placeholder
+    qInfo() << "About requested";
+}
+
+void MainWindow::onQuitRequested()
 {
     QApplication::quit();
 }

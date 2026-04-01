@@ -11,9 +11,12 @@
 #include <QListView>
 #include <QMainWindow>
 #include <QProxyStyle>
+#include <QSortFilterProxyModel>
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QWidget>
+
+class QPushButton;
 
 #if __has_include(<KWindowSystem>)
     #include <KWindowSystem>
@@ -37,9 +40,10 @@ public:
                                   const QModelIndex &index) const override;
 
 private:
-    static constexpr int Padding = 8;
-    static constexpr int IconSize = 32;
-    static constexpr int MaxTextLines = 3;
+    // Reduced padding and sizes to make items more compact
+    static constexpr int Padding = 4;
+    static constexpr int IconSize = 22;
+    static constexpr int MaxTextLines = 2;
 };
 
 // Main application window
@@ -66,6 +70,11 @@ private slots:
     void onTrayClearHistory();
     void onTrayQuit();
     void pasteSelectedItem();
+    // Phase 4: bottom action panel slots (stubbed for now)
+    void onClearAllRequested();
+    void onSettingsRequested();
+    void onAboutRequested();
+    void onQuitRequested();
 
 private:
     void setupUI();
@@ -82,8 +91,14 @@ private:
 
     // Data
     ClipboardModel *m_model;
+    QSortFilterProxyModel *m_proxyModel;
     SystemTray *m_tray;
     GlobalHotkey *m_hotkey;
+    // Phase 4: bottom action buttons
+    QPushButton *m_btnClearAll;
+    QPushButton *m_btnSettings;
+    QPushButton *m_btnAbout;
+    QPushButton *m_btnQuit;
     
     int m_currentIndex;
     bool m_ignoreFocusLoss;
